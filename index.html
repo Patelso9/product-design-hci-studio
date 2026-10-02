@@ -28,7 +28,9 @@ var weekTasks={
 {id:"reflect",title:"Reflect",prompt:"Write: What did I notice this week that I would not have noticed before studying HCI?",fields:[["reflection","Your reflection","textarea"]]}
 ]};
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]})}
-var state=JSON.parse(localStorage.getItem(KEY)||"null")||{week:1,tasks:{},taskData:{},concepts:[],observations:[],reflection:"",notes:"",evidence:[],startDate:"",endDate:""};
+var DEFAULT_STATE={week:1,tasks:{},taskData:{},concepts:[],observations:[],reflection:"",notes:"",evidence:[],startDate:"",endDate:""};
+var state;
+try{state=JSON.parse(localStorage.getItem(KEY)||"null")||DEFAULT_STATE}catch(e){state=DEFAULT_STATE;try{localStorage.removeItem(KEY)}catch(ignore){}}
 state.taskData=state.taskData||{};state.concepts=state.concepts||[];state.observations=state.observations||[];state.evidence=state.evidence||[];
 var page="dashboard";
 function save(){localStorage.setItem(KEY,JSON.stringify(state));render()}
@@ -76,5 +78,5 @@ function addConcept(){var t=document.getElementById("term").value.trim();if(!t)r
 function evidence(){var html='<div class="eyebrow">Applied practice</div><h1>Work & Evidence</h1><p class="hero">Log the work that proves what you are learning: research, IA, interaction design, evaluation, product thinking, and AI+UX.</p><div class="card"><h2>Add evidence</h2><div class="field"><label>Work item</label><input id="work"></div><div class="field"><label>Project / context</label><input id="project"></div><div class="field"><label>What did you do or learn?</label><textarea id="detail"></textarea></div><button class="btn" onclick="addEvidence()">Log work</button></div>';state.evidence.forEach(function(x){html+='<div class="card"><h3>'+esc(x.work)+'</h3><div class="small">'+esc(x.project)+'</div><p>'+esc(x.detail)+'</p></div>'});return html}
 function addEvidence(){state.evidence.unshift({work:document.getElementById("work").value,project:document.getElementById("project").value,detail:document.getElementById("detail").value});save()}
 function render(){var views={dashboard:dashboard,curriculum:curriculum,schedule:schedule,library:library,evidence:evidence};document.getElementById("app").innerHTML=views[page]()}
-nav();render();
+try{nav();render()}catch(e){document.getElementById("app").innerHTML='<div class="card"><h1>Studio could not load</h1><p>There was a browser-side error while loading the studio. Your saved data has not been intentionally deleted.</p><p class="small">Try a hard refresh. If this message remains, the error can be diagnosed from the browser console.</p></div>';console.error(e)}
 </script></body></html>
