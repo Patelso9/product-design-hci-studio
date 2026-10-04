@@ -69,7 +69,6 @@ var phaseData=[
 ];
 var phaseNames=phaseData.map(function(p){return p.title});
 var learningUnits=[];var weeks=[];phaseData.forEach(function(p){p.units.forEach(function(u,i){var id="p"+p.id+"u"+(i+1);learningUnits.push({id:id,phase:p.id,title:u[0],question:u[1]});weeks.push([u[0],u[1]])})});
-function phaseFor(w){var u=learningUnits[w-1];return u?u.phase:6}
 function phaseUnits(pid){return learningUnits.filter(function(u){return u.phase===pid})}
 var weekTasks={
 1:[
@@ -84,24 +83,38 @@ var DEFAULT_STATE={week:1,tasks:{},taskData:{},concepts:[],observations:[],refle
 var state;
 try{state=JSON.parse(localStorage.getItem(KEY)||"null")||DEFAULT_STATE}catch(e){state=DEFAULT_STATE;try{localStorage.removeItem(KEY)}catch(ignore){}}
 state.tasks=state.tasks||{};state.taskData=state.taskData||{};state.concepts=state.concepts||[];state.observations=state.observations||[];state.evidence=state.evidence||[];state.weekCompleted=state.weekCompleted||{};state.unitCompleted=state.unitCompleted||{};state.weeklyPractice=state.weeklyPractice||{};state.weeklyInputs=state.weeklyInputs||{};state.books=state.books||[];state.interfaceLogs=state.interfaceLogs||[];state.timer=state.timer||{running:false,startedAt:0,total:0};
+// New or previously unstarted studios always begin with the first learning unit.
+if(Object.keys(state.unitCompleted).length===0 && state.week>1){
+  state.week=1;
+  localStorage.setItem(KEY,JSON.stringify(state));
+}
 var page="dashboard";
 function save(){localStorage.setItem(KEY,JSON.stringify(state));render()}
 function go(p){page=p;nav();render()}
 function nav(){var items=[["dashboard","Dashboard"],["syllabus","Syllabus"],["curriculum","Curriculum"],["library","Design School Library"],["interface","Interface Practice"],["books","Books"]];document.getElementById("nav").innerHTML=items.map(function(x){return '<button class="'+(page===x[0]?"active":"")+'" onclick="go(\''+x[0]+'\')">'+x[1]+"</button>"}).join("")}
-function phaseFor(w){return w<=5?1:w<=13?2:w<=19?3:w<=27?4:w<=34?5:6}
-function currentTasks(w){if(weekTasks[w])return weekTasks[w];return[
-{id:"learn",title:"Learn the core material",prompt:"Complete the assigned learning for this week. Capture the ideas, examples, and questions that matter.",fields:[["learningNotes","What did you learn?","textarea"]]},
-{id:"apply",title:"Apply it to a real product",prompt:"Use this week’s concept to analyze a real product or experience.",fields:[["application","What did you observe or apply?","textarea"]]},
-{id:"capture",title:"Capture observations",prompt:"Record 3 useful observations, examples, or questions from your work.",fields:[["observations","Your 3 observations, examples, or questions","textarea"]]},
-{id:"concept",title:"Add to your vocabulary",prompt:"Add at least one useful concept to the Learning Library and explain it in your own words.",fields:[["conceptNotes","What concept did you capture and why does it matter?","textarea"]]},
-{id:"reflect",title:"Reflect",prompt:"What changed in your thinking this week?",fields:[["reflection","Your reflection","textarea"]]}
+function currentUnit(){return learningUnits[Math.max(0,state.week-1)]||learningUnits[0]}
+var unitTasks={
+"p1u1":weekTasks[1],
+"p1u2":[
+{id:"learn",title:"Learn: Mental models",prompt:"Study mental models, conceptual models, and system models. Focus on the mismatch between what a person believes is happening and how the system actually works.",fields:[["learningNotes","What is a mental model, and how can it differ from the system model?","textarea"]]},
+{id:"caseStudy",title:"Analyze 3 products",prompt:"Compare a thermostat, a car gear selector, and Apple/iOS Settings. For each, describe the user’s likely mental model and where the interface supports or conflicts with it.",fields:[["caseStudies","Your 3 mental-model analyses","textarea"]]},
+{id:"apply",title:"Map user vs. system model",prompt:"Choose one product and explicitly map what the user thinks is happening against what the system is actually doing. Identify the mismatch, if there is one.",fields:[["modelMap","User mental model vs. system model","textarea"]]},
+{id:"capture",title:"Capture the concept",prompt:"Add Mental Model to the Design School Library in your own words. Include one example and one counterexample.",fields:[["conceptNotes","Your definition, example, and counterexample","textarea"]]},
+{id:"reflect",title:"Reflect",prompt:"What did this exercise change about how you think about interface behavior and user expectations?",fields:[["reflection","Your reflection","textarea"]]}
+]
+};
+function currentTasks(w){var u=learningUnits[Math.max(0,w-1)]||learningUnits[0];return unitTasks[u.id]||[
+{id:"learn",title:"Learn the core material",prompt:"Complete the assigned learning for this unit. Capture the ideas, examples, and questions that matter.",fields:[["learningNotes","What did you learn?","textarea"]]},
+{id:"apply",title:"Apply it to a real product",prompt:"Use this unit’s concept to analyze a real product or experience.",fields:[["application","What did you observe or apply?","textarea"]]},
+{id:"capture",title:"Capture observations",prompt:"Record useful observations, examples, or questions from your work.",fields:[["observations","Your observations, examples, or questions","textarea"]]},
+{id:"reflect",title:"Reflect",prompt:"What changed in your thinking during this learning unit?",fields:[["reflection","Your reflection","textarea"]]}
 ]}
 function taskComplete(k,t){if(state.tasks[k])return true;var d=state.taskData[k]||{};return t.fields.every(function(f){return String(d[f[0]]||"").trim().length>0})}
 function taskHtml(t,index,w){var k=w+"-"+t.id,d=state.taskData[k]||{},complete=taskComplete(k,t);var fields=t.fields.map(function(f){var tag=f[2]==="textarea"?'<textarea data-task="'+esc(k)+'" data-field="'+esc(f[0])+'" oninput="saveTaskField(this)">'+esc(d[f[0]])+"</textarea>":'<input data-task="'+esc(k)+'" data-field="'+esc(f[0])+'" value="'+esc(d[f[0]])+'" oninput="saveTaskField(this)">';return '<div class="field"><label>'+esc(f[1])+'</label>'+tag+"</div>"}).join("");var related=t.id==="read"?'<div class="linkline"><button class="btn secondary" onclick="go(\'books\')">Open Books</button></div>':(t.id==="vocabulary"?'<div class="linkline"><button class="btn secondary" onclick="go(\'library\')">Open Learning Library</button></div>':"");return '<details class="task" '+(complete?"":"open")+'><summary><span class="task-title">'+(index+1)+'. '+esc(t.title)+'</span><span class="task-status">'+(complete?"Complete":"In progress")+'</span><input class="task-check" type="checkbox" '+(state.tasks[k]?"checked":"")+' '+(complete?"":"disabled")+' onclick="event.stopPropagation();toggleTask(\''+esc(k)+'\',this.checked)"></summary><div class="task-body"><div class="q">'+esc(t.prompt)+'</div>'+related+fields+'</div></details>'}
 function saveTaskField(el){var k=el.dataset.task;state.taskData[k]=state.taskData[k]||{};state.taskData[k][el.dataset.field]=el.value;localStorage.setItem(KEY,JSON.stringify(state));var t=currentTasks(state.week).filter(function(x){return state.week+"-"+x.id===k})[0];if(t){var status=taskComplete(k,t);var root=el.closest(".task");var s=root.querySelector(".task-status");if(s)s.textContent=status?"Complete":"In progress";var c=root.querySelector(".task-check");if(c)c.disabled=!status}}
 function toggleTask(k,val){state.tasks[k]=val;save()}
 function openWeek(i){state.week=i;go("curriculum")}
-function completeWeek(){var w=state.week,tasks=currentTasks(w);if(!tasks.every(function(t){return taskComplete(w+"-"+t.id,t)})){alert("Finish the required prompts before completing this week.");return}state.weekCompleted[w]=new Date().toISOString();if(w<44)state.week=w+1;save();page="curriculum";nav();render()}
+function completeWeek(){var w=state.week,tasks=currentTasks(w);if(!tasks.every(function(t){return taskComplete(w+"-"+t.id,t)})){alert("Finish the required prompts before completing this week.");return}state.weekCompleted[w]=new Date().toISOString();if(w<learningUnits.length)state.week=w+1;save();page="curriculum";nav();render()}
 function weekCompletedLabel(w){return state.weekCompleted[w]?formatDate(new Date(state.weekCompleted[w])):""}
 function toggleTimer(){if(state.timer.running){state.timer.total+=Date.now()-state.timer.startedAt;state.timer.running=false;state.timer.startedAt=0}else{state.timer.running=true;state.timer.startedAt=Date.now()}localStorage.setItem(KEY,JSON.stringify(state));updateTimer()}
 function timerSeconds(){return Math.floor((state.timer.total+(state.timer.running?Date.now()-state.timer.startedAt:0))/1000)}
