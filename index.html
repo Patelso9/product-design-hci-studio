@@ -69,6 +69,7 @@ var phaseData=[
 ];
 var phaseNames=phaseData.map(function(p){return p.title});
 var learningUnits=[];var weeks=[];phaseData.forEach(function(p){p.units.forEach(function(u,i){var id="p"+p.id+"u"+(i+1);learningUnits.push({id:id,phase:p.id,title:u[0],question:u[1]});weeks.push([u[0],u[1]])})});
+function phaseFor(w){var u=learningUnits[Math.max(0,w-1)]||learningUnits[0];return u.phase}
 function phaseUnits(pid){return learningUnits.filter(function(u){return u.phase===pid})}
 var weekTasks={
 1:[
